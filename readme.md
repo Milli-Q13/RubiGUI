@@ -6,7 +6,7 @@
 ---
 
 ## ■ フォルダ構成
-'''
+
 RubiGUI/\
  ├─ RubiGUI_Word_v2.0/      # Word版（ソースコード＋設定ファイル）\
  ├─ RubiGUI_PPT_v1.0/       # PPT版（ソースコード＋設定ファイル）\
@@ -14,7 +14,7 @@ RubiGUI/\
  └─ README.md               # このファイル
 
 ※ exe と dic は GitHub に置かない（.gitignore で除外）
-'''
+
 ---
 
 ## ■ GitHub 運用メモ（自分用）
