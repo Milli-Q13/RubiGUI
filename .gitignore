@@ -1,0 +1,27 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+
+# Packaging
+*.egg-info/
+
+# Logs
+*.log
+
+# Editor settings
+.vscode/
+
+# Windows
+Thumbs.db
