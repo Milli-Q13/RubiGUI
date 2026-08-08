@@ -25,3 +25,5 @@ dist/
 
 # Windows
 Thumbs.db
+
+*.dic
