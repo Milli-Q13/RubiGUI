@@ -9,13 +9,25 @@
 
 ```
 RubiGUI/
- ├─ RubiGUI_Word_v2.0/      # Word版（ソースコード＋設定ファイル）
- ├─ RubiGUI_PPT_v1.0/       # PPT版（ソースコード＋設定ファイル）
- ├─ docs/                   # 使い方メモなど
- └─ README.md               # このファイル
+ ├─ RubiGUI_word_v2.0/      # Word版（旧・保管用）
+ ├─ RubiGUI_word_v2.1/      # Word版 最新（ソースコード＋設定ファイル＋Module1.bas）
+ ├─ RubiGUI_ppt_v1.0/       # PPT版（旧・保管用）
+ ├─ RubiGUI_ppt_v1.1/       # PPT版 最新（ソースコード＋設定ファイル）
+ ├─ docs/
+ │   └─ CHANGELOG.md        # バージョンごとの変更履歴
+ └─ readme.md               # このファイル
 ```
 
 ※ exe と dic は GitHub に置かない（.gitignore で除外）
+
+### ● 最新版
+
+| 版 | バージョン | 本体 | 備考 |
+|---|---|---|---|
+| Word | v2.1 | `RubiGUI_word_v2.1/RubiGUI_V2.1.py` | **Module1.bas の入れ替えが必須**（マクロ名が `InsertFuriganaFromTSV_V21` に変更） |
+| PPT  | v1.1 | `RubiGUI_ppt_v1.1/RubiGUI_PPT_V1.1.py` | 既定のルビ範囲が「初回のみ」に変更（v1.0 は全出現） |
+
+変更内容の詳細は [docs/CHANGELOG.md](docs/CHANGELOG.md) を参照。
 
 ---
 

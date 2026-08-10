@@ -1,0 +1,4 @@
+tkinterdnd2
+sudachipy
+jaconv
+pywin32
