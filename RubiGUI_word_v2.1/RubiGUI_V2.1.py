@@ -17,6 +17,42 @@ from pathlib import Path
 APP_VERSION = "2.1"
 
 
+def hide_console_window():
+    """起動時に出る黒いコンソール画面を隠す。
+
+    ★重要：既に開いているコマンドプロンプトやターミナルから実行された
+    場合は隠さない。そのウィンドウはユーザーのものなので、隠すと
+    作業中の画面ごと消えてしまう。GetConsoleProcessList が 1 を返す
+    （＝このアプリのためだけに作られたコンソール）ときだけ隠す。
+
+    pythonw.exe での起動や、PyInstallerの --noconsole で作ったexeでは
+    そもそもコンソールが無いので、何もせずに戻る。"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+        hwnd = kernel32.GetConsoleWindow()
+        if not hwnd:
+            return  # コンソールを持っていない
+
+        # 自分だけがぶら下がっているコンソールかどうかを調べる
+        buf = (wintypes.DWORD * 8)()
+        attached = kernel32.GetConsoleProcessList(buf, len(buf))
+        if attached != 1:
+            return  # 別のシェルから起動された → 触らない
+
+        user32.ShowWindow(hwnd, 0)  # SW_HIDE
+    except Exception:
+        # 隠せなくても動作には支障がないので、黙って続行する
+        pass
+
+
+hide_console_window()
+
+
 def get_app_dir():
     """設定ファイル・辞書・ログを置くフォルダ（exe／スクリプトと同じ場所）を返す。
 
@@ -60,10 +96,12 @@ BUSY_HRESULTS = (
 )
 
 # 「Wordとの接続が切れた」ことを表すCOMのエラーコード。
-# 処理中にユーザーがWordを閉じた／Wordが落ちた場合に返る。
+# 処理中にユーザーがWordを閉じた／Wordが強制終了した／Word自身が
+# クラッシュした場合に返る。マクロの有無とは無関係。
 DISCONNECTED_HRESULTS = (
     -2147417848,  # RPC_E_DISCONNECTED        呼び出し先が切断されました
     -2147023174,  # RPC_S_SERVER_UNAVAILABLE  RPCサーバーを利用できません
+    -2147023170,  # RPC_S_CALL_FAILED         リモートプロシージャコールに失敗しました
 )
 
 
@@ -83,7 +121,12 @@ _log_handler = RotatingFileHandler(
 _log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 
 logging.basicConfig(level=logging.DEBUG, handlers=[_log_handler])
-logging.getLogger().addHandler(logging.StreamHandler())  # コンソールにも出す（従来のprintの代わり）
+# コンソールにも出す（従来のprintの代わり）。
+# ★コンソールを隠した場合や pythonw / --noconsole のexeでは sys.stderr が
+# None になる。そのまま StreamHandler を足すと、ログを出すたびに内部で
+# 例外が起きて握りつぶされる（無駄な処理になる）ので、あるときだけ足す。
+if sys.stderr is not None:
+    logging.getLogger().addHandler(logging.StreamHandler())
 
 # ✅ Sudachi初期化
 try:
@@ -1403,8 +1446,10 @@ class RubyEditorApp:
         if hresult in DISCONNECTED_HRESULTS:
             return (
                 "Wordとの接続が切れたため、処理を中断しました。\n\n"
-                "処理中にWordが閉じられたか、強制終了された可能性があります。\n"
+                "処理中にWordが閉じられたか、Word自体が終了した可能性があります。\n"
                 "処理が終わるまでWordを閉じずに、もう一度お試しください。\n\n"
+                "繰り返し発生する場合は、Module1.bas が最新版か確認してください。\n"
+                "（古い版では、この文書でWordが異常終了することがあります）\n\n"
                 f"詳細: {detail}"
             )
 
@@ -1423,6 +1468,20 @@ class RubyEditorApp:
 
 
 if __name__ == "__main__":
-    root = TkinterDnD.Tk()
-    app = RubyEditorApp(root)
-    root.mainloop()
+    # ★コンソールを隠したので、想定外のエラーが起きても画面に何も出ないまま
+    # 終了してしまう。最後の受け皿としてログに残し、ダイアログで知らせる。
+    try:
+        root = TkinterDnD.Tk()
+        app = RubyEditorApp(root)
+        root.mainloop()
+    except Exception as e:
+        logging.exception("予期しないエラーで終了しました")
+        try:
+            msgbox.showerror(
+                "エラー",
+                f"予期しないエラーが発生したため終了します。\n\n{e}\n\n"
+                f"詳細は次のログを確認してください:\n{LOG_PATH}"
+            )
+        except Exception:
+            pass
+        raise

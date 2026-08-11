@@ -21,6 +21,42 @@ import tkinter.filedialog as filedialog
 APP_VERSION = "1.1"
 
 
+def hide_console_window():
+    """起動時に出る黒いコンソール画面を隠す。
+
+    ★重要：既に開いているコマンドプロンプトやターミナルから実行された
+    場合は隠さない。そのウィンドウはユーザーのものなので、隠すと
+    作業中の画面ごと消えてしまう。GetConsoleProcessList が 1 を返す
+    （＝このアプリのためだけに作られたコンソール）ときだけ隠す。
+
+    pythonw.exe での起動や、PyInstallerの --noconsole で作ったexeでは
+    そもそもコンソールが無いので、何もせずに戻る。"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+        hwnd = kernel32.GetConsoleWindow()
+        if not hwnd:
+            return  # コンソールを持っていない
+
+        # 自分だけがぶら下がっているコンソールかどうかを調べる
+        buf = (wintypes.DWORD * 8)()
+        attached = kernel32.GetConsoleProcessList(buf, len(buf))
+        if attached != 1:
+            return  # 別のシェルから起動された → 触らない
+
+        user32.ShowWindow(hwnd, 0)  # SW_HIDE
+    except Exception:
+        # 隠せなくても動作には支障がないので、黙って続行する
+        pass
+
+
+hide_console_window()
+
+
 def get_app_dir():
     """設定ファイル・辞書・ログを置くフォルダ（exe／スクリプトと同じ場所）を返す。
 
@@ -56,7 +92,12 @@ _log_handler = RotatingFileHandler(
 _log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 
 logging.basicConfig(level=logging.DEBUG, handlers=[_log_handler])
-logging.getLogger().addHandler(logging.StreamHandler())  # コンソールにも出す
+# コンソールにも出す。
+# ★コンソールを隠した場合や pythonw / --noconsole のexeでは sys.stderr が
+# None になる。そのまま StreamHandler を足すと、ログを出すたびに内部で
+# 例外が起きて握りつぶされる（無駄な処理になる）ので、あるときだけ足す。
+if sys.stderr is not None:
+    logging.getLogger().addHandler(logging.StreamHandler())
 
 # ✅ Sudachi初期化（Word版と同じ設定・同じ辞書をそのまま使う）
 try:
@@ -977,7 +1018,12 @@ def adjust_line_spacing(shape, multiplier):
     ★重要：段落ごとに行間が違うシェイプ（箇条書きのレベル別など）では、
     シェイプ全体の ParagraphFormat は「混在」を意味する -2 を返す。これを
     そのまま退避すると復元時に不正値の書き戻しで例外になり、行間が広がった
-    まま元に戻せなくなる。必ず段落ごとに読み書きすること。"""
+    まま元に戻せなくなる。必ず段落ごとに読み書きすること。
+    ★重要：設定値は「掛ける倍率」ではなく「最低限確保する行間」として扱う。
+    v1.0 は元の行間に設定値を掛けていたため、あらかじめ行間1.5が設定して
+    ある段落だけ 1.5×1.5＝2.25 になり、そのスライドだけ極端に間延びして
+    いた。必要なのはルビを置く高さの確保であって、元の行間に比例した
+    上乗せではないので、既に十分広い段落はそのままにする。"""
     tr = shape.TextFrame.TextRange
     try:
         line_count = tr.Lines().Count
@@ -1011,7 +1057,13 @@ def adjust_line_spacing(shape, multiplier):
     _tag_set(shape, TAG_ORIG_SPACING, json.dumps(originals))
     final = []
     for index in range(1, para_count + 1):
-        value = bases[index - 1] * float(multiplier)
+        # 掛け算ではなく「最低限これだけは確保する」。既に設定値以上に
+        # 広い段落は触らないので、スライドごとに間延び具合が変わらない。
+        value = max(bases[index - 1], float(multiplier))
+        if value == bases[index - 1] and originals[index - 1][0] == MSO_TRUE:
+            # 既に十分広く、倍数指定のまま → 書き換える必要がない
+            final.append(value)
+            continue
         try:
             pf = tr.Paragraphs(index).ParagraphFormat
             pf.LineRuleWithin = MSO_TRUE
@@ -2291,6 +2343,20 @@ class RubyEditorApp:
 
 
 if __name__ == "__main__":
-    root = TkinterDnD.Tk()
-    app = RubyEditorApp(root)
-    root.mainloop()
+    # ★コンソールを隠したので、想定外のエラーが起きても画面に何も出ないまま
+    # 終了してしまう。最後の受け皿としてログに残し、ダイアログで知らせる。
+    try:
+        root = TkinterDnD.Tk()
+        app = RubyEditorApp(root)
+        root.mainloop()
+    except Exception as e:
+        logging.exception("予期しないエラーで終了しました")
+        try:
+            msgbox.showerror(
+                "エラー",
+                f"予期しないエラーが発生したため終了します。\n\n{e}\n\n"
+                f"詳細は次のログを確認してください:\n{LOG_PATH}"
+            )
+        except Exception:
+            pass
+        raise

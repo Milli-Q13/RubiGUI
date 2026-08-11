@@ -95,19 +95,33 @@ Public Sub InsertFuriganaFromTSV_V21(ByVal srcPath As String, _
     ' --- TSV（設定行＋語句）を読み込む ---
     Set terms = LoadTsv(tsvPath, rubyMode, rubyRatio, rubyOffset)
 
-    ' --- 出力先を用意し、作業用のコピーを作る ---
+    ' --- 出力先を用意し、作業用のコピーを %TEMP% に作る ---
     ' ★正式な出力名ではなく作業用の名前へコピーする。正式名へ直接コピーすると、
     '   この後の処理が失敗したときに「ルビの振られていないコピー」が
     '   完成品の顔で出力フォルダに残ってしまう。
+    '   置き場所は %TEMP%（同期対象外）。理由は PrepareOutput のコメント参照。
     PrepareOutput fso, srcPath, outPath, workPath
 
     ' --- 作業用コピーだけを開いて編集する ---
+    ' ★重要：Visible:=False で開いてはいけない。
+    '   ウィンドウが表示されていない文書に対して PhoneticGuide を呼ぶと、
+    '   Word が wwlib.dll でアクセス違反（0xC0000005）を起こして落ちる。
+    '   このとき VBA のエラーにもならないので ErrHandler も動かず、
+    '   Python 側には「リモート プロシージャ コールに失敗しました
+    '   （0x800706BE）」だけが返る。実測：語句0件なら完走、1件でも
+    '   ルビを振ろうとすると必ずクラッシュした。
+    '   Application 自体は Python 側が非表示にしているので、
+    '   文書にウィンドウを持たせても画面には出てこない。
     Application.ScreenUpdating = False
     Set docNew = Documents.Open(FileName:=workPath, _
                                 ConfirmConversions:=False, _
                                 ReadOnly:=False, _
                                 AddToRecentFiles:=False, _
-                                Visible:=False)
+                                Visible:=True)
+    ' ルビ付与はアクティブな文書を前提にした処理なので、明示的に前面へ出す
+    On Error Resume Next
+    docNew.Activate
+    On Error GoTo ErrHandler
 
     ' フィールドコードを検索対象から外す（元の文書に入っているフィールドの
     ' 中身にヒットして、そこへふりがなを差し込んでしまうのを防ぐ）
@@ -122,12 +136,14 @@ Public Sub InsertFuriganaFromTSV_V21(ByVal srcPath As String, _
     Set docNew = Nothing
     rubyDone = True
 
-    ' --- ここまで来て初めて正式な出力名にする ---
+    ' --- ここまで来て初めて出力先へ書き出す ---
     ' ★ここから先で失敗しても作業用コピーは消さない（rubyDone が True）。
-    '   前回の出力を消した直後に改名が失敗すると、完成したルビ付き文書が
-    '   作業用コピーにしか無い状態になるため、消すと成果物が失われる。
-    If fso.FileExists(outPath) Then fso.DeleteFile outPath, True
-    fso.MoveFile workPath, outPath
+    '   完成したルビ付き文書が作業用コピーにしか無い状態になるため、
+    '   消すと成果物が失われる。
+    ' ★「削除してから移動」ではなく上書きコピー1回にする。削除と移動の間に
+    '   失敗すると、出力が消えたままになる隙間ができるため。
+    fso.CopyFile workPath, outPath, True
+    fso.DeleteFile workPath, True
     workPath = ""
     rubyDone = False
 
@@ -261,6 +277,7 @@ Private Sub PrepareOutput(ByVal fso As Object, _
                           ByVal outPath As String, _
                           ByRef workPath As String)
     Dim outFolder As String
+    Dim tempFolder As String
     Dim i As Long
     Dim fullName As String
     Dim openName As String
@@ -274,15 +291,30 @@ Private Sub PrepareOutput(ByVal fso As Object, _
         End If
     End If
 
-    ' ★作業用コピーの名前は実行ごとに一意にする（日時を挟む）。
-    '   固定名にすると、前回「ルビは振れたが改名だけ失敗した」ときに
-    '   残した完成品を、次回の実行が上書きしたり、エラー時の後片付けで
-    '   削除したりしてしまう。一意なら自分が作った分だけを確実に扱える。
+    ' ★作業用コピーは %TEMP%（クラウド同期の対象外）に作る。
+    '   出力フォルダ（デスクトップ配下＝OneDriveの同期対象になりがち）に
+    '   作ると、コピー→改名の直後に同期エンジンが元の名前のファイルを
+    '   復活させることがあり、成功しているのに ~rubigui_〇〇 が残る。
+    '   実測：一括処理で「出力は正常・作業用コピーだけが元ファイルと
+    '   同一内容で残る」状態を確認した。出力フォルダへの書き込みは
+    '   最後の1回だけにして、この競合そのものを避ける。
+    ' ★名前は実行ごとに一意にする（日時を挟む）。固定名にすると、前回
+    '   「ルビは振れたが書き出しだけ失敗した」ときに残した完成品を、
+    '   次回の実行が上書きしたり後片付けで削除したりしてしまう。
     '   代わりに自己修復（次回の上書き）が効かなくなるので、
     '   古い残骸は下で掃除する。
+    tempFolder = Environ$("TEMP")
+    If Len(tempFolder) = 0 Then tempFolder = Environ$("TMP")
+    If Len(tempFolder) = 0 Or Not fso.FolderExists(tempFolder) Then
+        ' %TEMP% が取れない環境では、やむを得ず出力フォルダを使う
+        tempFolder = outFolder
+    End If
+
+    CleanupOldWorkFiles fso, tempFolder, fso.GetFileName(outPath)
+    ' 旧版が出力フォルダに作った残骸もここで掃除する
     CleanupOldWorkFiles fso, outFolder, fso.GetFileName(outPath)
 
-    workPath = outFolder & "\~rubigui_" & Format$(Now, "yyyymmddhhnnss") & _
+    workPath = tempFolder & "\~rubigui_" & Format$(Now, "yyyymmddhhnnss") & _
                "_" & fso.GetFileName(outPath)
 
     ' 前回の出力や作業用コピーが Word で開かれたままだと差し替えられないので
@@ -324,7 +356,9 @@ End Sub
 
 
 '------------------------------------------------------------
-' 出力フォルダに残っている古い作業用コピーを掃除する。
+' 指定フォルダに残っている古い作業用コピーを掃除する。
+' 通常は %TEMP% を渡すが、旧版が出力フォルダに残した分も掃除するため
+' 呼び出し元は両方のフォルダに対して呼ぶ。
 '
 ' ★作業用コピーの名前を実行ごとに一意にしたことで、「次回の実行が
 '   上書きする」という自己修復が効かなくなった。Wordの強制終了などで
