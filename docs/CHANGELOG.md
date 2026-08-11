@@ -294,6 +294,21 @@ v1.0 と同じ動作にしたい場合は「ルビを振る範囲」で「すべ
   フォルダに残した分も自動で回収される。
   **この修正には Module1.bas の再インポートが必要。**
 
+### 両版：exe のビルド手順を追加した
+
+- `packaging/build_exe.py` で両版の exe をビルドできるようにした
+  （`--onefile --noconsole`、出力先は各バージョンのフォルダ）。
+- **PyInstaller 標準の sudachipy フックが使わない辞書を同梱してしまう問題**を
+  回避するため、`packaging/hooks/hook-sudachipy.py` で上書きした。
+  標準フックはインストール済みの `sudachidict_full`（359.8MB）と
+  `sudachidict_core`（217.1MB）を無条件に取り込むため、exe が 215MB に
+  膨らんでいた。RubiGUI はこれらを使わず、exe と同じフォルダの
+  `system_full.dic` を実行時に読む。除外して **17.8MB** になった。
+  `--exclude-module` では止められない（フックが `collect_data_files` を
+  直接呼んでいるため）。
+- `.gitignore` に `*.exe` を追加した（readme には「除外している」と
+  書かれていたが実際には入っていなかった）。
+
 ### 両版：起動時の黒いコンソール画面を隠した
 
 - GUIアプリなのに、起動するとコマンドプロンプトの黒い画面が一緒に出ていた。

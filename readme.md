@@ -31,6 +31,29 @@ RubiGUI/
 
 ---
 
+## ■ exe のビルド
+
+```
+python packaging/build_exe.py          # 両方
+python packaging/build_exe.py word     # Word版だけ
+python packaging/build_exe.py ppt      # PPT版だけ
+```
+
+exe は各バージョンのフォルダに出力される（`sudachi.json` などと同じ場所）。
+1ファイル約 18MB。フォルダごと配布する。
+
+### ● 注意：`--collect-all sudachipy` は使わない
+
+PyInstaller 標準の sudachipy フックは、インストール済みの
+`sudachidict_full`（359MB）と `sudachidict_core`（217MB）を無条件に同梱し、
+exe が **215MB** に膨らむ。RubiGUI はこれらを使わず、exe と同じフォルダの
+`system_full.dic` を実行時に読む。
+
+`packaging/hooks/hook-sudachipy.py` で標準フックを上書きしてこれを防いでいる。
+`build_exe.py` はこのフックを使うので、必ずスクリプト経由でビルドすること。
+
+---
+
 ## ■ GitHub 運用メモ（自分用）
 
 ### ● 基本操作
