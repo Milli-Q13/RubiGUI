@@ -33,3 +33,6 @@ Thumbs.db
 *.dic
 # 動作確認用フィクスチャ（tests/make_fixture_*.py で再生成できる）
 tests/fixtures/
+
+# 実ファイルでの動作確認用（実際の授業プリントなので公開しない）
+test/

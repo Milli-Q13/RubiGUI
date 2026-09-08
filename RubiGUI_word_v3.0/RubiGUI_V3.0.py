@@ -1321,6 +1321,15 @@ class RubyEditorApp:
                 message += f"\nルビ {result['applied']} 件を付与しました。"
                 if result["applied"] == 0:
                     message += "\n\n※ルビが1件も付いていません。語句一覧を確認してください。"
+            # ★行間を緩めた段落があるとページ送りが変わることがあるので必ず知らせる。
+            #   黙って直すと「なぜかレイアウトが変わった」という不信につながる。
+            if result.get("loosened"):
+                message += (
+                    f"\n\n※行間が「固定値」の段落 {result['loosened']} 件を「最小値」に"
+                    "変更しました。\n"
+                    "　固定値のままだとルビが行に収まらず隠れてしまうためです。\n"
+                    "　行が高くなる分、ページ送りが変わることがあります。"
+                )
             msgbox.showinfo("ルビ付きWord出力", message)
 
         def on_error(exc):
@@ -1731,12 +1740,12 @@ class RubyEditorApp:
     def _read_macro_result(result_path):
         """マクロが書き出した .result（applied / skipped / error）を読んで消す。
         読めなくても処理自体は成功していることがあるので、件数を None にして続行する。"""
-        info = {"applied": None, "skipped": None, "error": False}
+        info = {"applied": None, "skipped": None, "loosened": None, "error": False}
         try:
             with open(result_path, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
                     key, _, value = line.strip().partition("\t")
-                    if key in ("applied", "skipped"):
+                    if key in ("applied", "skipped", "loosened"):
                         info[key] = int(value)
                     elif key == "error":
                         info["error"] = value == "1"

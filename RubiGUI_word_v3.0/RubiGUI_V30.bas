@@ -18,7 +18,16 @@ Option Explicit
 '     表を含む文書で処理が数分かかっていた原因はこれ。
 '     v3.0 は「見つかった位置が検索開始位置より前なら偽のヒット」とみなして
 '     即座に打ち切る。詳しくは InsertAllGuides を参照。
-'  2) 進捗を Python 側から見えるようにした。
+'  2) 行間が「固定値」の段落は「最小値」へ緩めるようにした。
+'     Wordの行間を固定値にすると行の高さがその値に固定されて伸びなくなる。
+'     ルビは親文字の上へ描かれるので余分な高さが要るが、伸びる余地が
+'     無いため、はみ出した分が切り取られて見えなくなる。
+'     実際の教材プリントでは、表の中の段落だけ15pt固定になっており、
+'     表の中のルビだけが見えないという症状が出ていた。
+'     値はそのままに規則だけを変えるので、ルビの無い行の高さは変わらず、
+'     収まらない行だけが必要な分だけ伸びる。詳しくは
+'     LoosenExactLineSpacing を参照。
+'  3) 進捗を Python 側から見えるようにした。
 '     処理中の件数を TSV と同じ場所の .progress ファイルへ書き出す。
 '     word.Run は1回の呼び出しの中で完結して戻ってこないため、
 '     途中経過を伝える手段がファイル経由しかない。
@@ -81,6 +90,8 @@ Public Sub InsertFuriganaFromTSV_V30(ByVal srcPath As String, _
     Dim savedScreenUpdating As Boolean
     Dim applied As Long
     Dim skipped As Long
+    ' 行間の固定値を緩めた段落の数（レイアウトが動いた量の目安として返す）
+    Dim loosened As Long
     Dim errMessage As String
     Dim workPath As String
     ' ルビ付与が終わって作業用コピーの保存まで済んだか。
@@ -147,7 +158,7 @@ Public Sub InsertFuriganaFromTSV_V30(ByVal srcPath As String, _
     On Error GoTo ErrHandler
 
     InsertAllGuides docNew, terms, rubyMode, rubyRatio, rubyOffset, _
-                    applied, skipped, tsvPath
+                    applied, skipped, loosened, tsvPath
 
     docNew.Save
     docNew.Close SaveChanges:=wdDoNotSaveChanges
@@ -169,7 +180,7 @@ Public Sub InsertFuriganaFromTSV_V30(ByVal srcPath As String, _
 
     ' 結果を Python が読めるようファイルに残す（GUIの完了メッセージで使う）
     DeleteProgress tsvPath
-    WriteResult tsvPath, rubyMode, applied, skipped, ""
+    WriteResult tsvPath, rubyMode, applied, skipped, loosened, ""
     Exit Sub
 
 ErrHandler:
@@ -193,7 +204,7 @@ ErrHandler:
     End If
     Application.ScreenUpdating = savedScreenUpdating
     DeleteProgress tsvPath
-    WriteResult tsvPath, rubyMode, applied, skipped, errMessage
+    WriteResult tsvPath, rubyMode, applied, skipped, loosened, errMessage
     On Error GoTo 0
     Err.Raise vbObjectError + 900, "RubiGUI", errMessage
 End Sub
@@ -447,6 +458,7 @@ Private Sub InsertAllGuides(ByVal docNew As Document, _
                             ByVal rubyOffset As Double, _
                             ByRef applied As Long, _
                             ByRef skipped As Long, _
+                            ByRef loosened As Long, _
                             ByVal tsvPath As String)
 
     Dim docLen As Long
@@ -571,7 +583,7 @@ Private Sub InsertAllGuides(ByVal docNew As Document, _
         If startOf(pos) > 0 Then
             info = matches(startOf(pos))
             Set rng = docNew.Range(CLng(info(0)), CLng(info(1)))
-            If ApplyGuide(rng, CStr(info(2)), rubyRatio, rubyOffset) Then
+            If ApplyGuide(rng, CStr(info(2)), rubyRatio, rubyOffset, loosened) Then
                 applied = applied + 1
             Else
                 skipped = skipped + 1
@@ -644,16 +656,64 @@ End Function
 
 
 '------------------------------------------------------------
+' ルビを振る段落の行間が「固定値」なら「最小値」へ緩める。
+' 戻り値は実際に変更した段落の数。
+'
+' ★なぜ必要か
+'   Wordの行間を「固定値」にすると、行の高さがその値に固定されて
+'   伸びなくなる。ルビは親文字の上へ描かれるため余分な高さが要るが、
+'   伸びる余地が無いので、はみ出した分が切り取られて見えなくなる。
+'   PhoneticGuide 自体は成功しており、ルビは文書の中に入っている。
+'   「ルビが振られていない」のではなく「見えていない」だけなので、
+'   出力を見ただけでは原因が分かりにくい。
+'
+' ★値ではなく規則だけを変える理由
+'   LineSpacing（値）はそのままに LineSpacingRule だけを
+'   wdLineSpaceExactly から wdLineSpaceAtLeast へ変える。
+'   こうすると、ルビの無い行の高さは今までと変わらず、ルビが入って
+'   収まらない行だけが必要な分だけ伸びる。行間そのものを広げると
+'   文書全体が間延びしてページ数まで変わってしまうため、
+'   レイアウトへの影響が最小になる方を選んでいる。
+'   ※それでも行が伸びる以上、ページ送りが変わる可能性はある。
+'     元ファイルは余裕を持った作りにしておくのが望ましい。
+'------------------------------------------------------------
+Private Function LoosenExactLineSpacing(ByRef rng As Range) As Long
+    Dim para As Paragraph
+    Dim changed As Long
+
+    changed = 0
+    On Error Resume Next
+    For Each para In rng.Paragraphs
+        If para.LineSpacingRule = wdLineSpaceExactly Then
+            Err.Clear
+            para.LineSpacingRule = wdLineSpaceAtLeast
+            If Err.Number = 0 Then changed = changed + 1
+            Err.Clear
+        End If
+    Next para
+    On Error GoTo 0
+
+    LoosenExactLineSpacing = changed
+End Function
+
+
+'------------------------------------------------------------
 ' 実際にルビを振る。ルビの大きさは親文字サイズに対する％で決める。
 '------------------------------------------------------------
 Private Function ApplyGuide(ByRef rng As Range, _
                             ByVal furigana As String, _
                             ByVal rubyRatio As Double, _
-                            ByVal rubyOffset As Double) As Boolean
+                            ByVal rubyOffset As Double, _
+                            ByRef loosened As Long) As Boolean
     Dim baseSize As Double
     Dim guideSize As Double
     Dim baseFont As String
     Dim ok As Boolean
+
+    ' ★ルビを差し込む前に、行間の固定値を緩めておく。
+    '   固定値のままだとルビが行からはみ出して切り取られ、
+    '   「ルビは振られているのに見えない」状態になる。
+    loosened = loosened + LoosenExactLineSpacing(rng)
 
     baseSize = 0#
     baseFont = ""
@@ -743,6 +803,7 @@ Private Sub WriteResult(ByVal tsvPath As String, _
                         ByVal rubyMode As String, _
                         ByVal applied As Long, _
                         ByVal skipped As Long, _
+                        ByVal loosened As Long, _
                         ByVal errMessage As String)
     Dim resultPath As String
     Dim fileNum As Integer
@@ -754,6 +815,7 @@ Private Sub WriteResult(ByVal tsvPath As String, _
     Print #fileNum, "mode" & vbTab & rubyMode
     Print #fileNum, "applied" & vbTab & CStr(applied)
     Print #fileNum, "skipped" & vbTab & CStr(skipped)
+    Print #fileNum, "loosened" & vbTab & CStr(loosened)
     If Len(errMessage) > 0 Then
         Print #fileNum, "error" & vbTab & "1"
     End If
