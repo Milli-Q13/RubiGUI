@@ -31,3 +31,5 @@ Thumbs.db
 
 # Sudachi dictionary (巨大ファイル)
 *.dic
+# 動作確認用フィクスチャ（tests/make_fixture_*.py で再生成できる）
+tests/fixtures/

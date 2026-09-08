@@ -33,12 +33,12 @@ WORK = REPO / "build"
 
 TARGETS = {
     "word": {
-        "script": REPO / "RubiGUI_word_v2.1" / "RubiGUI_V2.1.py",
-        "name": "RubiGUI_V2.1",
+        "script": REPO / "RubiGUI_word_v3.0" / "RubiGUI_V3.0.py",
+        "name": "RubiGUI_V3.0",
     },
     "ppt": {
-        "script": REPO / "RubiGUI_ppt_v1.1" / "RubiGUI_PPT_V1.1.py",
-        "name": "RubiGUI_PPT_V1.1",
+        "script": REPO / "RubiGUI_ppt_v1.2" / "RubiGUI_PPT_V1.2.py",
+        "name": "RubiGUI_PPT_V1.2",
     },
 }
 
@@ -94,7 +94,7 @@ def main():
         print(f"  {exe.stat().st_size / 1e6:>7.1f} MB  {exe}")
     print("\n配布するときは、exe と同じフォルダに次を入れてください:")
     print("  sudachi.json / system_full.dic / override.json / ruby_settings.json / readme.txt")
-    print("  （Word版は Module1.bas も）")
+    print("  （Word版は RubiGUI_V30.bas も）")
 
     if WORK.exists():
         shutil.rmtree(WORK, ignore_errors=True)
