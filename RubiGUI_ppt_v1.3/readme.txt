@@ -32,7 +32,7 @@ MITライセンスで提供しています（同梱の LICENSE.txt を参照）�
 
 ● 不具合を報告するとき
   次の3つを添えていただけると、調査がはるかに早くなります。
-    1. タイトルバーに出ている版番号（例: RubiGUI-PPT v1.3）
+    1. 画面右下に出ている版番号（例: RubiGUI-PPT v1.3）
     2. このソフトのフォルダにある rubigui_ppt.log
        （Word版は rubigui.log）
     3. 何をしたら何が起きたか
@@ -116,8 +116,8 @@ ruby_settings.json         … ルビ設定の保存ファイル（自動生成�
 LICENSE.txt                … 本ソフトのライセンス（MIT）
 THIRD-PARTY-NOTICES.txt    … 同梱している部品のライセンス表示
 はじめにお読みください.pdf … 最初にお読みいただく案内
-readme_Word.txt             … Word版のガイド
-readme_PPT.txt              … 本ガイド（PowerPoint版）
+readme_Word.txt            … Word版のガイド
+readme_PPT.txt             … 本ガイド（PowerPoint版）
 
 ※ これらのファイルは同じフォルダに置いてください。
 ※ アプリはフォルダ内のファイルを参照して動作します。
@@ -131,7 +131,7 @@ readme_PPT.txt              … 本ガイド（PowerPoint版）
 ■ バージョンの確認方法
 ------------------------------------------------------------
 
-アプリのウィンドウタイトルおよび画面右下に「RubiGUI-PPT v1.3」と表示されます。
+ウィンドウタイトルには「ルビ編集ツール(PowerPoint版) v1.3」、画面右下には「RubiGUI-PPT v1.3」と表示されます。
 不具合や質問を連絡する際は、この表示されているバージョン番号も
 あわせてお伝えください。
 
