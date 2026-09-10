@@ -143,6 +143,26 @@ logging.basicConfig(level=logging.DEBUG, handlers=[_log_handler])
 if sys.stderr is not None:
     logging.getLogger().addHandler(logging.StreamHandler())
 
+
+def log_startup_banner():
+    """起動したことと版番号をログに残す。
+
+    不具合報告ではログを送ってもらうので、版がログから分かるようにしておく。
+    報告者が版番号を書き間違えても、ログを見れば確実に特定できる。
+
+    ★重要：この定義と呼び出しは、必ず下の「Sudachi初期化」ブロックより
+    前に置くこと。Sudachi辞書の初期化に失敗すると、その場で sys.exit(1)
+    してこれより後ろの処理は一切実行されない。以前はこの呼び出しが
+    `if __name__ == "__main__":` の中（GUI初期化の直前）にしか無かった
+    ため、辞書初期化に失敗した場合──導入手順書が警告している「zipの中
+    から直接exeを実行すると辞書が見つからず起動に失敗する」がまさにこれ
+    ──に限って、実際に届く起動失敗のログから版番号だけが欠落していた。
+    """
+    logging.info(f"===== RubiGUI Word版 v{APP_VERSION} 起動 =====")
+
+
+log_startup_banner()   # ★辞書初期化より前に出す。起動に失敗したログでも版が分かるように
+
 # ✅ Sudachi初期化
 try:
     tokenizer_obj = dictionary.Dictionary(config_path=str(SUDACHI_CONFIG_PATH)).create()
@@ -176,15 +196,6 @@ DEFAULT_SETTINGS = {
 }
 RUBY_MODE_FIRST = "first"
 RUBY_MODE_ALL = "all"
-
-
-def log_startup_banner():
-    """起動したことと版番号をログに残す。
-
-    不具合報告ではログを送ってもらうので、版がログから分かるようにしておく。
-    報告者が版番号を書き間違えても、ログを見れば確実に特定できる。
-    """
-    logging.info(f"===== RubiGUI Word版 v{APP_VERSION} 起動 =====")
 
 
 def load_settings():
@@ -1860,8 +1871,9 @@ class RubyEditorApp:
 if __name__ == "__main__":
     # ★コンソールを隠したので、想定外のエラーが起きても画面に何も出ないまま
     # 終了してしまう。最後の受け皿としてログに残し、ダイアログで知らせる。
+    # log_startup_banner() はここでは呼ばない（モジュール読み込み時、
+    # Sudachi辞書初期化より前に既に呼んでいる。ここでも呼ぶと二重に出る）。
     try:
-        log_startup_banner()
         root = TkinterDnD.Tk()
         app = RubyEditorApp(root)
 

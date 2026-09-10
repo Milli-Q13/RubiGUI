@@ -4,6 +4,7 @@
 版番号を書き間違えても調査できる。
 """
 import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -33,25 +34,34 @@ def _strip_line_comments(text):
 
 
 @pytest.mark.parametrize("path", [WORD_APP, PPT_APP], ids=["Word版", "PPT版"])
-def test_log_startup_banner_is_called_before_tk_init_in_main(path):
-    """log_startup_banner() が起動時の配線から外れていないことをソース上で確認する。
+def test_log_startup_banner_is_called_before_sudachi_dictionary_init(path):
+    """log_startup_banner() が Sudachi辞書の初期化より前に呼ばれていることをソース上で確認する。
+
+    Sudachi辞書の初期化（dictionary.Dictionary(...)）に失敗すると、その場で
+    sys.exit(1) して起動処理が打ち切られる。log_startup_banner() の呼び出しが
+    それより後ろにあると、実際に届く起動失敗のログ（zipの中からexeを直接
+    実行した場合など）には版番号が一切残らない。これはTask 3の目的そのものを
+    潰してしまうため、モジュール読み込み順として辞書初期化より前に
+    呼ばれていることを固定する。
 
     conftest.py はモジュールを importlib で読み込むだけで `__main__` を実行しない
-    （GUIを起動させないため）。そのため呼び出し側を普通に呼んで確かめることができず、
-    `if __name__ == "__main__":` 以降のソーステキストを直接読んで検査する。
+    （GUIを起動させないため）。そのためモジュール読み込み時点の呼び出しを普通に
+    呼んで確かめることができず、ソーステキストを直接読んで検査する。
     """
-    text = path.read_text(encoding="utf-8")
-    marker = 'if __name__ == "__main__":'
-    assert marker in text, f"{path.name} に __main__ ブロックが見つからない"
+    text = _strip_line_comments(path.read_text(encoding="utf-8"))
 
-    main_block = _strip_line_comments(text[text.index(marker):])
-    assert "log_startup_banner()" in main_block, (
-        f"{path.name} の __main__ ブロックから log_startup_banner() の呼び出しが消えている"
+    dict_marker = "dictionary.Dictionary("
+    assert dict_marker in text, f"{path.name} に Sudachi辞書の初期化が見つからない"
+
+    # "def log_startup_banner():" 自体は呼び出しではないので除外する。
+    call_match = re.search(r"(?<!def )log_startup_banner\(\)", text)
+    assert call_match is not None, (
+        f"{path.name} から log_startup_banner() の呼び出しが消えている"
     )
 
-    call_pos = main_block.index("log_startup_banner()")
-    tk_pos = main_block.index("TkinterDnD.Tk()")
-    assert call_pos < tk_pos, (
-        f"{path.name} で log_startup_banner() が TkinterDnD.Tk() より後になっている"
-        "（他の処理より先にログを出す、という要件が壊れている）"
+    call_pos = call_match.start()
+    dict_pos = text.index(dict_marker)
+    assert call_pos < dict_pos, (
+        f"{path.name} で log_startup_banner() が Sudachi辞書の初期化より後になっている"
+        "（辞書初期化に失敗した場合の起動失敗ログに版番号が残らない）"
     )

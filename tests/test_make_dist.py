@@ -49,11 +49,17 @@ def test_sha256_matches_a_known_value(tmp_path):
 
 
 def test_allowlist_has_no_forbidden_pattern():
-    """許可リスト自体が禁止パターンに触れていないこと。"""
+    """許可リスト自体が禁止パターンに触れていないこと。
+
+    禁止パターンを手書きすると、make_dist.FORBIDDEN_SUFFIXES /
+    FORBIDDEN_NAMES 側に新しいパターンが増えたときに乖離する
+    （実際に .pyc と .spec が手書き版から漏れていた）。モジュール側の
+    定義をそのまま参照することで、乖離しようがない形にする。
+    """
     for entry in make_dist.ALLOWLIST:
-        assert not entry.dest.endswith(".py")
-        assert not entry.dest.endswith(".log")
-        assert entry.dest != "requirements.txt"
+        dest_lower = entry.dest.lower()
+        assert not dest_lower.endswith(make_dist.FORBIDDEN_SUFFIXES)
+        assert dest_lower not in make_dist.FORBIDDEN_NAMES
 
 
 @pytest.mark.parametrize("name, is_dir", [
@@ -142,6 +148,31 @@ def test_build_removes_out_dir_when_a_later_step_fails(tmp_path, monkeypatch):
     assert not out_dir.exists()
 
 
+def test_build_refuses_to_touch_an_out_dir_with_unrelated_contents(tmp_path, monkeypatch):
+    """--out の指定ミスで無関係なフォルダの中身を消さないことを保証する。
+
+    build() は先頭で `shutil.rmtree(out_dir)` を無条件に実行していた。
+    `--out .` ならリポジトリの作業ツリーが（.git ごと）、`--out D:\\授業資料`
+    ならそこが、検証より前に丸ごと消えてしまう。
+    ここでは「SystemExit が出た」ことだけでなく「無関係なファイルが実際に
+    残っている」ことまで確認する。消してから例外を出しても前者だけの
+    テストでは通ってしまうため。
+    """
+    monkeypatch.setattr(make_dist, "ALLOWLIST", _dummy_allowlist(tmp_path))
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    stranger = out_dir / "無関係なファイル.txt"
+    stranger.write_text("大事なデータ", encoding="utf-8")
+
+    with pytest.raises(SystemExit):
+        make_dist.build(out_dir, tmp_path / "dummy.dic")
+
+    # 例外が出ただけでなく、無関係なファイルが実際に残っていること。
+    assert stranger.exists()
+    assert stranger.read_text(encoding="utf-8") == "大事なデータ"
+
+
 def test_make_zip_uses_forward_slashes_and_utf8_flag_for_non_ascii_names(tmp_path):
     """zip エントリ名がスラッシュ区切りになり、日本語名は UTF-8 フラグ付きで
     格納されることを保証する。
@@ -166,3 +197,24 @@ def test_make_zip_uses_forward_slashes_and_utf8_flag_for_non_ascii_names(tmp_pat
 
         info = zf.getinfo("RubiGUI_test/はじめにお読みください.pdf")
         assert info.flag_bits & 0x800  # UTF-8 フラグ（bit 11）
+
+
+def test_readmes_folder_structure_section_matches_the_allowlist():
+    """両readmeの「■ フォルダ構成」が配布物の一覧（ALLOWLIST）と一致することを保証する。
+
+    現状は手で確認して一致しているだけなので、次に ALLOWLIST へ
+    エントリを足したときに readme を更新し忘れてもテストは黙って通って
+    しまう。配布物に実際に入るファイル名が、両readmeの本文中のどこかに
+    最低1回は書かれていることを機械的に確認する。
+    """
+    expected_names = {e.dest for e in make_dist.ALLOWLIST} | {
+        "system_full.dic",
+        "THIRD-PARTY-NOTICES.txt",
+    }
+
+    word_readme = (REPO / "RubiGUI_word_v3.1" / "readme.txt").read_text(encoding="utf-8")
+    ppt_readme = (REPO / "RubiGUI_ppt_v1.3" / "readme.txt").read_text(encoding="utf-8")
+
+    for readme_text, label in ((word_readme, "Word版readme"), (ppt_readme, "PPT版readme")):
+        missing = sorted(name for name in expected_names if name not in readme_text)
+        assert not missing, f"{label} の「■ フォルダ構成」に無い（と思われる）ファイル: {missing}"

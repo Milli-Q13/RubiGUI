@@ -31,6 +31,13 @@ DOCS_DIR = REPO / "docs"
 
 BUNDLE_NAME = "RubiGUI_2026-09"
 DEFAULT_DIC = REPO / "RubiGUI_word_v3.0" / "system_full.dic"
+# ★注意：THIRD-PARTY-NOTICES.txt の SudachiDict-full の版数表記は、
+#   gen_notices.py が開発環境の pip メタデータから取得したものであり、
+#   実際に同梱される .dic の中身は --dic が指すファイルそのもの（現状は
+#   上記 DEFAULT_DIC）である。両者は別経路で決まるため、辞書ファイルだけを
+#   更新して pip 側（requirements.txt の SudachiDict-full）を更新し忘れると、
+#   告知の版数表記と実際に同梱する辞書の中身がずれる。辞書を更新する際は
+#   pip 側のバージョンも合わせること。
 
 
 @dataclass(frozen=True)
@@ -81,6 +88,29 @@ def check_no_forbidden(folder):
         )
 
 
+def _assert_safe_out_dir(out_dir):
+    """--out の指定ミスで無関係なフォルダを消さないための門番。
+
+    build() はこの直後に out_dir を rmtree する。--out . ならリポジトリの
+    作業ツリーが（.git ごと）、--out D:\\授業資料 ならそこが、検証より前に
+    丸ごと消えてしまう。out_dir がリポジトリ本体やその親、あるいは
+    ドライブのルートそのものでないこと、既に存在する場合は中身が
+    過去の配布物（既知のファイル名だけ）であることを確認してから戻る。
+    """
+    out_dir = Path(out_dir).resolve()
+    if out_dir == REPO or out_dir in REPO.parents or out_dir.parent == out_dir:
+        raise SystemExit(f"--out にこの場所は指定できません: {out_dir}")
+    if not out_dir.exists():
+        return
+    known = {e.dest for e in ALLOWLIST} | {"system_full.dic", "THIRD-PARTY-NOTICES.txt"}
+    strangers = sorted(p.name for p in out_dir.iterdir() if p.name not in known)
+    if strangers:
+        raise SystemExit(
+            f"--out の指定先は空でも過去の配布フォルダでもありません（何も削除していません）:\n"
+            f"  {out_dir}\n  中身: " + "、".join(strangers[:10])
+        )
+
+
 def build(out_dir, dic):
     """許可リストのファイルだけを集めて配布フォルダを組む。
 
@@ -92,6 +122,8 @@ def build(out_dir, dic):
     オペレーターが目視で「できている」と誤認して手で zip 化してしまい、
     THIRD-PARTY-NOTICES.txt や辞書を欠いた配布物が外部に出かねない。
     """
+    _assert_safe_out_dir(out_dir)
+
     out_dir = Path(out_dir)
     dic = Path(dic)
     if out_dir.exists():
@@ -121,6 +153,8 @@ def build(out_dir, dic):
         check_no_forbidden(out_dir)
     except BaseException:
         shutil.rmtree(out_dir, ignore_errors=True)
+        if out_dir.exists():
+            print(f"※ 組み立て途中のフォルダを削除しきれませんでした。手で削除してください: {out_dir}")
         raise
 
     return out_dir
