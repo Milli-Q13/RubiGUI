@@ -1439,6 +1439,25 @@ python -c "import zipfile; [print(n) for n in sorted(zipfile.ZipFile('dist/RubiG
 
 Expected: 12ファイル。`.py` / `.log` / `__pycache__` / `requirements.txt` が**1つも無いこと**を目視で確認する。
 
+- [ ] **Step 4b: exe に開発環境のパスが埋め込まれていないか確認する**
+
+PyInstaller がビルド時のパスを実行ファイルに残すことがある。既存の v3.0 / v1.2 の exe を
+調べた限りでは埋め込まれていなかったが、これはビルドの呼び出し方に依存する性質なので、
+**実際に配る成果物に対して確認する**。
+
+```bash
+python -c "
+from pathlib import Path
+for name in ['RubiGUI_word_v3.1/RubiGUI_Word_v3.1.exe', 'RubiGUI_ppt_v1.3/RubiGUI_PPT_v1.3.exe']:
+    b = Path(name).read_bytes()
+    hits = [w for w in ['milli','OneDrive','Desktop','RubiGUI_v2']
+            if w.encode('ascii') in b or w.encode('utf-16-le') in b]
+    print(name, '→', hits or 'クリーン')
+"
+```
+
+Expected: 両方とも `クリーン`
+
 - [ ] **Step 5: クリーンな環境で展開して起動する**
 
 OneDrive の同期対象外のフォルダ（例 `C:\RubiGUI_test`）に展開する。
