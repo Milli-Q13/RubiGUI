@@ -392,9 +392,32 @@ def load_settings():
 
 
 def save_settings(settings):
+    """ルビ設定を ruby_settings.json に保存する。
+
+    ★重要：Word版とPPT版は同じフォルダに同居し、同じ ruby_settings.json を
+    共有する。両版が持つキーは一致しない（PPT版だけが line_spacing と
+    include_title を持つ）ので、自分の設定だけを書き出すと相手版のキーが
+    消える。読み込み側は知らないキーを無視するため気づきにくく、
+    「設定したはずなのに戻っている」という分かりにくい不具合になる。
+    そのため、既存の内容を読んでから自分のキーだけを更新して書き戻す。
+    """
+    merged = {}
+    try:
+        if SETTINGS_PATH.exists():
+            with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                merged.update(loaded)
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
+        # 読み直せない場合は「相手版のキーは救えないが、自分の設定は保存する」方に倒す。
+        # ここで諦めると、ファイルが一度壊れたきり設定を保存できなくなる。
+        logging.warning(f"{SETTINGS_PATH.name} を読み直せませんでした（上書きします）: {e}")
+
+    merged.update(settings)
+
     try:
         with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2, ensure_ascii=False)
+            json.dump(merged, f, indent=2, ensure_ascii=False)
     except OSError as e:
         logging.error(f"{SETTINGS_PATH.name} の保存に失敗しました: {e}")
 
