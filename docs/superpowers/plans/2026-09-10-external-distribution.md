@@ -53,7 +53,22 @@
 
 ### 辞書ファイルの扱い
 
-`system_full.dic`（359.8MB）を新しい版フォルダに複製しない。既に複数の版フォルダにコピーが存在しディスクを圧迫しているため、これ以上増やさない。`make_dist.py` が `--dic` で指定されたパスから配布物へコピーする（既定値 `RubiGUI_word_v3.0/system_full.dic`）。
+`make_dist.py` が `--dic` で指定されたパスから配布物へコピーする（既定値 `RubiGUI_word_v3.0/system_full.dic`）。
+
+**ただし新しい版フォルダにも辞書の実体が必要である。** アプリはモジュールの読み込み時点で
+Sudachi辞書を初期化し、失敗するとエラーダイアログを出して `sys.exit(1)` する。
+そのため辞書が無いと `tests/conftest.py` からの import が成立せず、テストが動かない。
+
+ディスクを増やさずにこれを満たすため、**新しい版フォルダの `system_full.dic` は
+`RubiGUI_word_v3.0/system_full.dic` へのハードリンク**にする（NTFS。実体は1つ、容量の増加なし）。
+
+```bash
+python -c "import os; os.link('RubiGUI_word_v3.0/system_full.dic', 'RubiGUI_word_v3.1/system_full.dic')"
+python -c "import os; os.link('RubiGUI_word_v3.0/system_full.dic', 'RubiGUI_ppt_v1.3/system_full.dic')"
+```
+
+辞書は `.gitignore` 済みなので、この措置は各自の作業環境だけの話であり、
+リポジトリにも配布物にも影響しない。
 
 **動作確認は版フォルダではなく、組み上がった配布フォルダに対して行う。** 配布する物そのものを試すことになるので、この方が確実である。
 
@@ -188,8 +203,11 @@ cp RubiGUI_ppt_v1.2/override.json RubiGUI_ppt_v1.2/ruby_settings.json RubiGUI_pp
 
 置換対象は3箇所すべてASCIIなので、バイト単位の置換で CP932 のまま安全に書き換えられる。
 
+**`-b`（バイナリモード）を必ず付ける。** この環境の GNU sed は `-b` 無しだと
+CRLF を LF に変換してしまい、`.bas` の改行コードが壊れる。
+
 ```bash
-sed -i 's/V30/V31/g' RubiGUI_word_v3.1/RubiGUI_V31.bas
+sed -bi 's/V30/V31/g' RubiGUI_word_v3.1/RubiGUI_V31.bas
 grep -c "V31" RubiGUI_word_v3.1/RubiGUI_V31.bas
 ```
 
