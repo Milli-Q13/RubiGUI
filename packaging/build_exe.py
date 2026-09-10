@@ -33,12 +33,12 @@ WORK = REPO / "build"
 
 TARGETS = {
     "word": {
-        "script": REPO / "RubiGUI_word_v3.0" / "RubiGUI_V3.0.py",
-        "name": "RubiGUI_V3.0",
+        "script": REPO / "RubiGUI_word_v3.1" / "RubiGUI_V3.1.py",
+        "name": "RubiGUI_Word_v3.1",
     },
     "ppt": {
-        "script": REPO / "RubiGUI_ppt_v1.2" / "RubiGUI_PPT_V1.2.py",
-        "name": "RubiGUI_PPT_V1.2",
+        "script": REPO / "RubiGUI_ppt_v1.3" / "RubiGUI_PPT_V1.3.py",
+        "name": "RubiGUI_PPT_v1.3",
     },
 }
 
@@ -92,9 +92,7 @@ def main():
     print("\n=== ビルド結果 ===")
     for exe in built:
         print(f"  {exe.stat().st_size / 1e6:>7.1f} MB  {exe}")
-    print("\n配布するときは、exe と同じフォルダに次を入れてください:")
-    print("  sudachi.json / system_full.dic / override.json / ruby_settings.json / readme.txt")
-    print("  （Word版は RubiGUI_V30.bas も）")
+    print("\n配布物の組み立ては packaging/make_dist.py で行ってください。")
 
     if WORK.exists():
         shutil.rmtree(WORK, ignore_errors=True)
