@@ -46,13 +46,32 @@ RubiGUI には次のオープンソースソフトウェアが含まれていま
 
 
 def _read_text(path):
-    """ライセンスファイルは配布元によって文字コードが異なるので順に試す。"""
-    for encoding in ("utf-8", "cp932", "latin-1"):
+    """ライセンスファイルは配布元によって文字コードが異なるので順に試す。
+
+    utf-8 → cp932 の順で正しくデコードできればそれを使う。どちらも失敗した
+    場合、以前は latin-1 にフォールバックしていたが、latin-1 は256バイト値
+    すべてに対応する全単射のため常に「それらしい」文字列を返してしまい、
+    実際には文字コードを取り違えたまま気づかず誤った本文を採用する恐れが
+    あった（このファイルは法的義務を果たすためのものなので、誤った本文を
+    静かに採用するより、ビルドを止めて人間に気づかせる方が安全）。そこで
+    最終手段として errors="replace" で読み、U+FFFD（置換文字）が1つでも
+    出た場合は文字コードを特定できなかったとみなして SystemExit で止める。
+    """
+    for encoding in ("utf-8", "cp932"):
         try:
             return Path(path).read_text(encoding=encoding)
         except (UnicodeDecodeError, LookupError):
             continue
-    return Path(path).read_text(encoding="utf-8", errors="replace")
+
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    if "�" in text:
+        raise SystemExit(
+            f"文字コードを特定できませんでした: {path}\n"
+            "utf-8 / cp932 のいずれでも正しく読めません。"
+            "実際の文字コード（EUC-JP・UTF-16 等）を確認し、"
+            "必要なら _read_text の対応エンコーディングに追加してください。"
+        )
+    return text
 
 
 def _collect_from_package(name):
@@ -65,8 +84,13 @@ def _collect_from_package(name):
 
     found = []
     for f in files:
-        upper = str(f).upper()
-        if any(m in upper for m in _MARKERS):
+        # パス全体ではなく、ファイル自身の名前（basename）だけを見る。
+        # そうしないと "licenses/" のようなディレクトリ名に含まれる語で
+        # そのディレクトリ配下の無関係なファイルまで拾ってしまう一方、
+        # "LICENSE" 等の語が入ったディレクトリ配下にある jaconv・pyinstaller の
+        # 本物のライセンスファイルは basename 判定でも問題なく拾える。
+        basename_upper = Path(str(f)).name.upper()
+        if any(m in basename_upper for m in _MARKERS):
             path = Path(dist.locate_file(f))
             if path.is_file():
                 found.append((str(f), _read_text(path)))
@@ -95,7 +119,13 @@ def generate(out_path):
     missing = []
 
     for name in BUNDLED:
-        entries = _collect_from_package(name) or _collect_from_manual(name)
+        # package 側と手置き側の両方を集めて結合する（どちらかで打ち切らない）。
+        # 手置きファイルは「package から本物のライセンスが取れない」からこそ
+        # 用意されている（例: SudachiPy）。以前は `or` で package 側の結果が
+        # 1件でもあれば手置きを無視していたため、将来 package が名前だけ似た
+        # 無関係なファイルを同梱するようになった場合、正しい手置き本文が
+        # 黙って握りつぶされる恐れがあった。
+        entries = _collect_from_package(name) + _collect_from_manual(name)
         if not entries:
             missing.append(name)
             continue

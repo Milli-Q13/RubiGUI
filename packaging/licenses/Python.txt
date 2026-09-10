@@ -1,5 +1,5 @@
 Python (https://www.python.org/)
-Copyright (c) 2001-2026 Python Software Foundation. All Rights Reserved.
+Copyright (c) 2001-2024 Python Software Foundation. All Rights Reserved.
 Licensed under the PSF License Agreement
 
 ------------------------------------------------------------
