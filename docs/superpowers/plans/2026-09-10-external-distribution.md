@@ -1197,19 +1197,26 @@ readme の `override.json` の節に、この3語を選んだ理由を1行足す
 **`.bas` は CP932 なので、バイト単位の `sed` ではなく Python で読み書きする。**
 CP932 の2バイト文字の下位バイトが ASCII と衝突しうるため、バイト置換は安全ではない。
 
+**一括置換してはいけない。** 19行目の `v3.0 は…` は v3.0 の挙動を説明する履歴であり、
+書き換えると記録が壊れる。直すのは5行目と7行目だけである。
+
+**読み込み側にも `newline=''` が要る。** `read_text` は CRLF を LF に畳むため、
+これを付けないと書き戻したときに改行コードが LF only になって壊れる。
+
 ```bash
 python -c "
-from pathlib import Path
-p = Path('RubiGUI_word_v3.1/RubiGUI_V31.bas')
-t = p.read_text(encoding='cp932')
-t = t.replace('v3.0', 'v3.1').replace('RubiGUI_V3.1.py', 'RubiGUI_V3.1.py')
-p.write_text(t, encoding='cp932', newline='')
+p = 'RubiGUI_word_v3.1/RubiGUI_V31.bas'
+with open(p, encoding='cp932', newline='') as f:
+    lines = f.readlines()
+lines[4] = lines[4].replace('v3.0', 'v3.1')          # 5行目: 版表記
+lines[6] = lines[6].replace('V3.0.py', 'V3.1.py')    # 7行目: 呼び出し元の参照
+with open(p, 'w', encoding='cp932', newline='') as f:
+    f.writelines(lines)
 "
 ```
 
-※ 上のコマンドは `v3.0` → `v3.1` で両方（版表記と `RubiGUI_V3.0.py`）が同時に直る。
-`newline=''` を付けないと CRLF が壊れる。書き換え後に `v3.0` が0件、`v3.1` が2件に
-なることを確認する。
+書き換え後、`v3.0` は**1件**（19行目の履歴）、`v3.1` は**1件**（5行目）になる。
+7行目は `RubiGUI_V3.1.py`（大文字 V）なので小文字の集計には入らない。
 
 - [ ] **Step 3: 職場前提・開発者向けの記述を落とす**
 
@@ -1275,7 +1282,11 @@ grep -c "RubiGUI_V30\.bas\|InsertFuriganaFromTSV_V30" RubiGUI_word_v3.1/readme.t
 python -c "from pathlib import Path; t=Path('RubiGUI_word_v3.1/RubiGUI_V31.bas').read_text(encoding='cp932'); print('v3.0:', t.count('v3.0'), 'v3.1:', t.count('v3.1'))"
 ```
 
-Expected: 1つ目は何も出力されない / 2つ目は `0` / 3つ目は `v3.0: 0 v3.1: 2`
+Expected:
+- 1つ目（職場前提の記述）: 何も出力されない
+- 2つ目: **`2`**。いずれも残って正しいもの。1つは「v3.0→v3.1 で名前が変わった」という
+  移行案内の対比表（消すと手順が意味不明になる）、もう1つは過去の変更を説明する履歴の節
+- 3つ目: **`v3.0: 1 v3.1: 1`**。`v3.0` の1件は19行目の履歴
 
 - [ ] **Step 6: コミット**
 
