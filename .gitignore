@@ -36,3 +36,6 @@ tests/fixtures/
 
 # 実ファイルでの動作確認用（実際の授業プリントなので公開しない）
 test/
+
+# 第三者ライセンス告知（packaging/gen_notices.py が毎回生成する）
+packaging/THIRD-PARTY-NOTICES.txt

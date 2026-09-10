@@ -1,0 +1,129 @@
+"""THIRD-PARTY-NOTICES.txt を生成する。
+
+RubiGUI の exe には複数のオープンソースが同梱されている。いずれも
+コピーレフトではないため RubiGUI 自体のソース公開義務は生じないが、
+**ライセンス本文と告知を配布物に添える義務**はある。手書きすると
+ライブラリを更新したときに更新を忘れるので、生成できるものは生成する。
+
+★すべてを自動収集できるわけではない。
+  ・SudachiPy は配布物にライセンスファイルを同梱していない
+  ・Python 本体と Tcl/Tk は pip パッケージではない
+  これらは packaging/licenses/ に手置きし、収集分と結合する。
+  どちらにも無い同梱物があれば、告知漏れのまま配布しないよう停止する。
+"""
+import importlib.metadata as md
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+MANUAL_DIR = HERE / "licenses"
+
+# 配布物に同梱されるもの。pip パッケージ名か、手置きファイルの名前（拡張子なし）。
+BUNDLED = [
+    "SudachiPy",
+    "SudachiDict-full",
+    "tkinterdnd2",
+    "jaconv",
+    "pywin32",
+    "pyinstaller",
+    "Python",
+    "TclTk",
+]
+
+# 収集対象とみなすファイル名の目印。LEGAL は SudachiDict の告知ファイル。
+_MARKERS = ("LICENSE", "NOTICE", "LEGAL", "COPYING")
+
+_HEADER = """\
+RubiGUI 第三者ソフトウェアのライセンス告知
+============================================================
+
+RubiGUI には次のオープンソースソフトウェアが含まれています。
+それぞれのライセンス本文と告知を以下に収録します。
+
+このファイルは packaging/gen_notices.py が自動生成しています。
+手で編集しないでください。
+
+"""
+
+
+def _read_text(path):
+    """ライセンスファイルは配布元によって文字コードが異なるので順に試す。"""
+    for encoding in ("utf-8", "cp932", "latin-1"):
+        try:
+            return Path(path).read_text(encoding=encoding)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return Path(path).read_text(encoding="utf-8", errors="replace")
+
+
+def _collect_from_package(name):
+    """pip パッケージからライセンスファイルを集める。無ければ空リスト。"""
+    try:
+        dist = md.distribution(name)
+        files = md.files(name) or []
+    except md.PackageNotFoundError:
+        return []
+
+    found = []
+    for f in files:
+        upper = str(f).upper()
+        if any(m in upper for m in _MARKERS):
+            path = Path(dist.locate_file(f))
+            if path.is_file():
+                found.append((str(f), _read_text(path)))
+    return found
+
+
+def _collect_from_manual(name):
+    """packaging/licenses/ に手置きされた本文を読む。無ければ空リスト。"""
+    path = MANUAL_DIR / f"{name}.txt"
+    if path.is_file():
+        return [(f"licenses/{path.name}（手置き）", _read_text(path))]
+    return []
+
+
+def _version(name):
+    try:
+        return md.version(name)
+    except md.PackageNotFoundError:
+        return None
+
+
+def generate(out_path):
+    """THIRD-PARTY-NOTICES.txt を書き出し、そのパスを返す。"""
+    out_path = Path(out_path)
+    parts = [_HEADER]
+    missing = []
+
+    for name in BUNDLED:
+        entries = _collect_from_package(name) or _collect_from_manual(name)
+        if not entries:
+            missing.append(name)
+            continue
+
+        version = _version(name)
+        title = f"{name} {version}" if version else name
+        parts.append("=" * 60)
+        parts.append(title)
+        parts.append("=" * 60)
+        parts.append("")
+        for origin, body in entries:
+            parts.append(f"--- {origin} ---")
+            parts.append("")
+            parts.append(body.rstrip())
+            parts.append("")
+
+    if missing:
+        raise SystemExit(
+            "告知を用意できない同梱物があります: " + "、".join(missing) + "\n"
+            "pip パッケージ名が正しいか確認するか、"
+            f"{MANUAL_DIR} に <名前>.txt としてライセンス本文を置いてください。"
+        )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(parts), encoding="utf-8")
+    return out_path
+
+
+if __name__ == "__main__":
+    written = generate(HERE / "THIRD-PARTY-NOTICES.txt")
+    print(f"generated: {written} ({written.stat().st_size} bytes)")
