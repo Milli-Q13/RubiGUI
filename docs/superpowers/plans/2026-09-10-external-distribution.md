@@ -1134,6 +1134,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `RubiGUI_ppt_v1.3/readme.txt`
 - Modify: `RubiGUI_word_v3.1/override.json`
 - Modify: `RubiGUI_ppt_v1.3/override.json`
+- Modify: `RubiGUI_word_v3.1/RubiGUI_V31.bas`（先頭コメントの版表記のみ）
 
 **Interfaces:**
 - Consumes: なし
@@ -1164,7 +1165,53 @@ readme の `override.json` の節に、この3語を選んだ理由を1行足す
    辞書編集画面から削除してかまいません。
 ```
 
-- [ ] **Step 2: 職場前提・開発者向けの記述を落とす**
+- [ ] **Step 2: 配布物の中に残っている旧版の表記を更新する**
+
+版フォルダは v3.0 / v1.2 からのコピーで作られているため、**中身の版表記が古いまま**である。
+このまま配ると、v3.1 のフォルダを受け取った人が `RubiGUI_V30.bas` を探すことになる。
+
+`RubiGUI_word_v3.1/readme.txt`:
+
+| 現在 | 変更後 |
+|---|---|
+| `v3.0` / `RubiGUI_V3.0.py` | `v3.1` / `RubiGUI_V3.1.py` |
+| `RubiGUI_V30.bas` | `RubiGUI_V31.bas` |
+| モジュール名 `RubiGUI_V30` | `RubiGUI_V31` |
+| マクロ名 `InsertFuriganaFromTSV_V30` | `InsertFuriganaFromTSV_V31` |
+| 見出し `■ v2.1 から変更された点` | `■ v3.0 から変更された点`（内容も v3.1 の変更に差し替える） |
+
+`RubiGUI_ppt_v1.3/readme.txt`:
+
+| 現在 | 変更後 |
+|---|---|
+| `v1.2` / `RubiGUI_PPT_V1.2.py` | `v1.3` / `RubiGUI_PPT_V1.3.py` |
+
+**過去の変更履歴を説明している節（「v2.1 から変更された点」「v2.0 から変更された点」の
+本文）は、そこが履歴である限り版番号を書き換えない。** 書き換えるのは「今の版が何か」を
+述べている箇所と、利用者が実際に触るファイル名である。
+
+あわせて `RubiGUI_word_v3.1/RubiGUI_V31.bas` の先頭コメントに残っている `v3.0` を直す
+（2箇所: 5行目の版表記、7行目の `RubiGUI_V3.0.py` への参照）。マクロ名は Task 1 で
+更新済みなので触らない。
+
+**`.bas` は CP932 なので、バイト単位の `sed` ではなく Python で読み書きする。**
+CP932 の2バイト文字の下位バイトが ASCII と衝突しうるため、バイト置換は安全ではない。
+
+```bash
+python -c "
+from pathlib import Path
+p = Path('RubiGUI_word_v3.1/RubiGUI_V31.bas')
+t = p.read_text(encoding='cp932')
+t = t.replace('v3.0', 'v3.1').replace('RubiGUI_V3.1.py', 'RubiGUI_V3.1.py')
+p.write_text(t, encoding='cp932', newline='')
+"
+```
+
+※ 上のコマンドは `v3.0` → `v3.1` で両方（版表記と `RubiGUI_V3.0.py`）が同時に直る。
+`newline=''` を付けないと CRLF が壊れる。書き換え後に `v3.0` が0件、`v3.1` が2件に
+なることを確認する。
+
+- [ ] **Step 3: 職場前提・開発者向けの記述を落とす**
 
 `RubiGUI_word_v3.1/readme.txt` から次の節を削除する。
 
@@ -1178,7 +1225,7 @@ readme の `override.json` の節に、この3語を選んだ理由を1行足す
 
 `RubiGUI_ppt_v1.3/readme.txt` についても同じ作業を行う。
 
-- [ ] **Step 3: サポート方針の節を両方の readme の冒頭に足す**
+- [ ] **Step 4: サポート方針の節を両方の readme の冒頭に足す**
 
 版名の直後に置く。文面は両版で同じにする（ログのファイル名だけ読み替える）。
 
@@ -1220,15 +1267,17 @@ MITライセンスで提供しています（同梱の LICENSE.txt を参照）�
     3. 何をしたら何が起きたか
 ```
 
-- [ ] **Step 4: 落とし忘れが無いか確認する**
+- [ ] **Step 5: 落とし忘れが無いか確認する**
 
 ```bash
 grep -n "PyInstaller\|requirements\|pip install" RubiGUI_word_v3.1/readme.txt RubiGUI_ppt_v1.3/readme.txt
+grep -c "RubiGUI_V30\.bas\|InsertFuriganaFromTSV_V30" RubiGUI_word_v3.1/readme.txt
+python -c "from pathlib import Path; t=Path('RubiGUI_word_v3.1/RubiGUI_V31.bas').read_text(encoding='cp932'); print('v3.0:', t.count('v3.0'), 'v3.1:', t.count('v3.1'))"
 ```
 
-Expected: 何も出力されない
+Expected: 1つ目は何も出力されない / 2つ目は `0` / 3つ目は `v3.0: 0 v3.1: 2`
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 6: コミット**
 
 ```bash
 git add RubiGUI_word_v3.1/readme.txt RubiGUI_ppt_v1.3/readme.txt RubiGUI_word_v3.1/override.json RubiGUI_ppt_v1.3/override.json
