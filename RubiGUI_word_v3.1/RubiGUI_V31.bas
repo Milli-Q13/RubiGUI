@@ -2,9 +2,9 @@ Attribute VB_Name = "RubiGUI_V31"
 Option Explicit
 
 '============================================================
-' RubiGUI（Word版）v3.0  ルビ付与マクロ
+' RubiGUI（Word版）v3.1  ルビ付与マクロ
 '
-' RubiGUI_V3.0.py から次の形で呼び出される：
+' RubiGUI_V3.1.py から次の形で呼び出される：
 '   word.Run("InsertFuriganaFromTSV_V31", 元ファイル, TSVファイル, 出力ファイル)
 '
 ' ★v2.1 からの主な変更点
