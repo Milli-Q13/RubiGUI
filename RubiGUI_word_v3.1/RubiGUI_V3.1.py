@@ -178,6 +178,15 @@ RUBY_MODE_FIRST = "first"
 RUBY_MODE_ALL = "all"
 
 
+def log_startup_banner():
+    """起動したことと版番号をログに残す。
+
+    不具合報告ではログを送ってもらうので、版がログから分かるようにしておく。
+    報告者が版番号を書き間違えても、ログを見れば確実に特定できる。
+    """
+    logging.info(f"===== RubiGUI Word版 v{APP_VERSION} 起動 =====")
+
+
 def load_settings():
     """ルビ設定を ruby_settings.json から読み込む（無ければ既定値）"""
     settings = dict(DEFAULT_SETTINGS)
@@ -1852,6 +1861,7 @@ if __name__ == "__main__":
     # ★コンソールを隠したので、想定外のエラーが起きても画面に何も出ないまま
     # 終了してしまう。最後の受け皿としてログに残し、ダイアログで知らせる。
     try:
+        log_startup_banner()
         root = TkinterDnD.Tk()
         app = RubyEditorApp(root)
 
