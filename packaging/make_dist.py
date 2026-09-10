@@ -71,7 +71,7 @@ def check_no_forbidden(folder):
     folder = Path(folder)
     hits = []
     for path in folder.rglob("*"):
-        if path.name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
+        if path.name.lower() in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
             hits.append(str(path.relative_to(folder)))
     if hits:
         raise SystemExit(
@@ -82,11 +82,20 @@ def check_no_forbidden(folder):
 
 
 def build(out_dir, dic):
-    """許可リストのファイルだけを集めて配布フォルダを組む。"""
+    """許可リストのファイルだけを集めて配布フォルダを組む。
+
+    コピーを始める前に ALLOWLIST と辞書の存在を確認する（--dic の
+    指定ミスはリリース当日に起こりやすい操作ミス）。コピー開始後に
+    何かが失敗した場合（辞書コピーの失敗、gen_notices.generate() の
+    例外、ディスクフル等）は、途中まで組み上がった out_dir を丸ごと
+    削除してから例外を再送出する。中途半端な配布フォルダを残すと、
+    オペレーターが目視で「できている」と誤認して手で zip 化してしまい、
+    THIRD-PARTY-NOTICES.txt や辞書を欠いた配布物が外部に出かねない。
+    """
     out_dir = Path(out_dir)
+    dic = Path(dic)
     if out_dir.exists():
         shutil.rmtree(out_dir)
-    out_dir.mkdir(parents=True)
 
     missing = [e.src for e in ALLOWLIST if not e.src.is_file()]
     if missing:
@@ -96,18 +105,24 @@ def build(out_dir, dic):
             + "\nexe が未ビルドなら packaging/build_exe.py を先に実行してください。"
         )
 
-    for entry in ALLOWLIST:
-        shutil.copy2(entry.src, out_dir / entry.dest)
-
-    dic = Path(dic)
     if not dic.is_file():
         raise SystemExit(f"辞書が見つかりません: {dic}\n--dic で場所を指定してください。")
-    print(f"辞書をコピー中（{dic.stat().st_size / 1e6:.1f} MB）...", flush=True)
-    shutil.copy2(dic, out_dir / "system_full.dic")
 
-    gen_notices.generate(out_dir / "THIRD-PARTY-NOTICES.txt")
+    out_dir.mkdir(parents=True)
+    try:
+        for entry in ALLOWLIST:
+            shutil.copy2(entry.src, out_dir / entry.dest)
 
-    check_no_forbidden(out_dir)
+        print(f"辞書をコピー中（{dic.stat().st_size / 1e6:.1f} MB）...", flush=True)
+        shutil.copy2(dic, out_dir / "system_full.dic")
+
+        gen_notices.generate(out_dir / "THIRD-PARTY-NOTICES.txt")
+
+        check_no_forbidden(out_dir)
+    except BaseException:
+        shutil.rmtree(out_dir, ignore_errors=True)
+        raise
+
     return out_dir
 
 
