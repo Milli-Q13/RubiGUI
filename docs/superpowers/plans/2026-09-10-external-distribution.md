@@ -1359,7 +1359,7 @@ RubiGUI 導入の手引き（2026年9月版）
         ・「マクロが見つかりません」→ 手順(3)のインポート先が Normal か確認
 
 6. 困ったときは
-   ・タイトルバーの版番号を控える
+   ・画面右下の版番号を控える（例: RubiGUI v3.1 / RubiGUI-PPT v1.3）
    ・rubigui.log（PowerPoint版は rubigui_ppt.log）を用意する
    ・取りまとめの方へ連絡する
 ```
