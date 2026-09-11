@@ -27,7 +27,7 @@ Word / PowerPoint をCOMで操作して作るので、実行中は勝手にウ�
 ／「ルビ付きPowerPoint出力」を実行する。
 出力は `デスクトップ／ルビ振り／出力（ルビ付き）／` に入る。
 
-※ Word版は事前に `RubiGUI_V30.bas` を Normal.dotm へインポートしておくこと。
+※ Word版は事前に `RubiGUI_V31.bas` を Normal.dotm へインポートしておくこと。
 
 ### 3. 結果を照合する
 
