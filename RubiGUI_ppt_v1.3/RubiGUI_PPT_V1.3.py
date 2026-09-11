@@ -1700,25 +1700,33 @@ class RubyEditorApp:
         self.ruby_dir, self.output_dir = get_ruby_project_dirs()
 
     # ---------- 設定 ----------
-    def read_settings_from_ui(self):
-        """入力欄の値を検証して self.settings へ取り込む。不正なら既定値に戻す。"""
+    def read_settings_from_ui(self, quiet=False):
+        """入力欄の値を検証して self.settings へ取り込む。不正なら既定値に戻す。
+
+        ★quiet=True は「閉じるときの保存」用。入力欄に不正な値が残ったまま
+        閉じられた場合でも警告ダイアログを出さない。終了しようとしている人を
+        ダイアログで引き止めるのは筋が悪いし、破棄処理を止めかねないため。
+        値の扱い（既定値に戻す）は通常時と同じ。
+        """
         def to_float(entry, key, minimum, maximum):
             raw = entry.get().strip()
             fallback = float(DEFAULT_SETTINGS[key])
             try:
                 value = float(raw)
             except ValueError:
-                msgbox.showwarning(
-                    "ルビ設定",
-                    f"「{raw}」は数値として読み取れないため、既定値 {DEFAULT_SETTINGS[key]} を使用します。"
-                )
+                if not quiet:
+                    msgbox.showwarning(
+                        "ルビ設定",
+                        f"「{raw}」は数値として読み取れないため、既定値 {DEFAULT_SETTINGS[key]} を使用します。"
+                    )
                 value = None
             if value is not None and not (minimum <= value <= maximum):
-                msgbox.showwarning(
-                    "ルビ設定",
-                    f"{value} は指定できる範囲（{minimum}〜{maximum}）外のため、"
-                    f"既定値 {DEFAULT_SETTINGS[key]} を使用します。"
-                )
+                if not quiet:
+                    msgbox.showwarning(
+                        "ルビ設定",
+                        f"{value} は指定できる範囲（{minimum}〜{maximum}）外のため、"
+                        f"既定値 {DEFAULT_SETTINGS[key]} を使用します。"
+                    )
                 value = None
             if value is None:
                 # 入力欄も直しておかないと、次回も同じ警告が出続けてしまう
@@ -2778,6 +2786,15 @@ if __name__ == "__main__":
                     "途中で閉じるとPowerPointが終了しないまま残ることがあります。"
                 )
                 return
+            # ★入力欄の数値（ルビの大きさ・高さ、行間）は read_settings_from_ui()
+            # でしか保存されず、その関数はファイルを処理する経路からしか呼ばれない。
+            # 入力欄には変更を検知する仕組みが無いので、ここで保存しないと
+            # 「設定を変えて閉じただけ」の値が失われ、開き直すと既定値に戻る。
+            # 保存に失敗しても終了は妨げない（閉じられない方が困るため）。
+            try:
+                app.read_settings_from_ui(quiet=True)
+            except Exception:
+                logging.exception("終了時の設定保存に失敗しました")
             root.destroy()
 
         root.protocol("WM_DELETE_WINDOW", on_close)
