@@ -1434,11 +1434,21 @@ Expected: `RubiGUI_Word_v3.1.exe` と `RubiGUI_PPT_v1.3.exe` がそれぞれ約 
 
 - [ ] **Step 3: 配布物を組み立てる**
 
+**組み立て先を OneDrive の外にすること。** このリポジトリは OneDrive 配下にあり、
+既定の出力先 `dist/` も同期対象になる。359.8MB を書いては消す作業を同期対象の場所で
+行うと、OneDrive やエクスプローラーがフォルダを掴んで削除に失敗し、**冒頭の
+`rmtree` で `PermissionError` を出して中断する**（実際に発生した）。
+利用者に「OneDrive に置かないでください」と案内しているのと同じ構図である。
+
 ```bash
-python packaging/make_dist.py
+python packaging/make_dist.py --out "C:/RubiGUI_dist/RubiGUI_2026-09"
 ```
 
-Expected: `dist/RubiGUI_2026-09.zip` が生成され、SHA-256 が表示される。サイズは約 396MB（辞書359.8MB + exe 17.8MB×2）。
+Expected: `C:\RubiGUI_dist\RubiGUI_2026-09.zip` が生成され、SHA-256 が表示される。
+
+**`| tail` などでパイプしないこと。** パイプの終了コードは最後のコマンドのものになるため、
+`make_dist.py` が失敗しても成功に見える。実際にこれで中断を見落とした。
+失敗を見逃さないよう、出力は最後まで確認する。サイズは約 396MB（辞書359.8MB + exe 17.8MB×2）。
 
 - [ ] **Step 4: 配布物の中身を確認する**
 
