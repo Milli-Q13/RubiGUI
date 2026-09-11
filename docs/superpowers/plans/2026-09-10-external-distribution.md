@@ -1426,6 +1426,10 @@ Expected: Task 1〜5 のテスト（23件）がすべて PASS
 
 - [ ] **Step 2: exe をビルドする**
 
+PyInstaller の作業フォルダはリポジトリの外（システムの一時領域）に置く設定にしてある。
+リポジトリ内に置くと OneDrive の同期と衝突し、`PermissionError` でビルドが落ちる
+（実際に発生した）。
+
 ```bash
 python packaging/build_exe.py
 ```

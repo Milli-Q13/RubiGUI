@@ -24,12 +24,17 @@ import argparse
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 HOOKS = REPO / "packaging" / "hooks"
-WORK = REPO / "build"
+# ★PyInstaller の作業フォルダはリポジトリの外に置く。
+# このリポジトリは OneDrive 配下にあり、作業フォルダを中に置くと同期対象になる。
+# ビルド中に大量のファイルを書いては消すため OneDrive と衝突し、
+# PermissionError（アクセスが拒否されました）でビルドが落ちる（実際に発生した）。
+WORK = Path(tempfile.gettempdir()) / "RubiGUI_build"
 
 TARGETS = {
     "word": {
